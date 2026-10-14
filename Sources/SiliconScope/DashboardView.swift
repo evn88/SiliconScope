@@ -1,7 +1,7 @@
 //
 //  File:      DashboardView.swift
 //  Created:   2026-06-08
-//  Updated:   2026-09-29
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Full-window dashboard. Header (chip, cores, SoC power, battery), then
 //             CPU + GPU side by side, combined Memory|Bandwidth and Network|Disk cards
@@ -1149,6 +1149,7 @@ private struct NetworkDiskCard: View {
                        value: "↓ \(formatRate(iface.downloadBytesPerSec))  ↑ \(formatRate(iface.uploadBytesPerSec))")
                 }
             }
+            NetworkAddressesView(network: network)
             Spacer(minLength: 4)
             Sparkline(downHistory, color: downColor, role: .inline(height: Layout.Meter.sparklinePair))
             Sparkline(upHistory, color: upColor, role: .inline(height: Layout.Meter.sparklinePair))

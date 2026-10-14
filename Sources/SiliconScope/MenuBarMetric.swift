@@ -1,7 +1,7 @@
 //
 //  File:      MenuBarMetric.swift
 //  Created:   2026-06-19
-//  Updated:   2026-09-29
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  iStat-style menu-bar glyph renderers and the per-metric dropdown panels. Glyphs are
 //             drawn to NSImage (the only reliable way to render a live status-item label) and adapt
@@ -705,14 +705,14 @@ struct NETMenuDropdown: View {
                     Image(systemName: ifaceIcon(i)).font(.system(size: Icon.large)).foregroundStyle(Theme.accent)
                     VStack(alignment: .leading, spacing: Space.hair) {
                         Text(i.name).font(Theme.font(.body)).foregroundStyle(Theme.text).lineLimit(1)
-                        if let ip = i.ipv4 {
-                            Text(ip).font(Theme.font(.caption)).foregroundStyle(Theme.dim)
-                        }
+
                     }
                     Spacer(minLength: 0)
                     Text("Connected").font(Theme.font(.caption)).foregroundStyle(green)
                 }
             }
+            Divider()
+            NetworkAddressesView(network: n)
             Divider()
             MenuKV(label: "↓ Download", value: formatRate(n.downloadBytesPerSec), color: MetricPalette.downC)
             Sparkline(monitor.history.netDown, color: MetricPalette.downC, role: .inline(height: Layout.Meter.sparklinePair))

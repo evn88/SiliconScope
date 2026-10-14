@@ -1,14 +1,14 @@
 //
 //  File:      InterfaceSampler.swift
 //  Created:   2026-06-19
-//  Updated:   2026-06-22
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Lists network interfaces (friendly name, BSD name, IPv4, connected) sudolessly
 //             via SystemConfiguration (display names) + getifaddrs (addresses / up state).
 //             Powers the Network menu-bar dropdown's interface list + "Not Connected".
-//  Notes:     Local only — no public-IP lookup (that would be an outbound request, against
-//             the app's "nothing leaves your Mac" stance). Per-process network I/O is not
-//             obtainable sudolessly, so it's omitted.
+//  Notes:     This sampler remains local only. Public-IP requests are separate and opt-in.
+//             Connected includes usable IPv6-only interfaces. Per-process network I/O
+//             is not obtainable sudolessly, so it is omitted.
 //
 import Foundation
 import SystemConfiguration
@@ -37,6 +37,7 @@ public enum InterfaceSampler {
         // IPv4 addresses + running state from getifaddrs.
         var ipByBSD: [String: String] = [:]
         var running: Set<String> = []
+        var addressed: Set<String> = []
         var head: UnsafeMutablePointer<ifaddrs>?
         if getifaddrs(&head) == 0 {
             var cur = head
@@ -46,11 +47,16 @@ public enum InterfaceSampler {
                 if (ifa.ifa_flags & UInt32(IFF_UP)) != 0 && (ifa.ifa_flags & UInt32(IFF_RUNNING)) != 0 {
                     running.insert(bsd)
                 }
-                if let addr = ifa.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET) {
+                if let addr = ifa.ifa_addr,
+                   addr.pointee.sa_family == UInt8(AF_INET) || addr.pointee.sa_family == UInt8(AF_INET6) {
                     var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
                     if getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count),
                                    nil, 0, NI_NUMERICHOST) == 0 {
-                        ipByBSD[bsd] = String(cBuffer: host)
+                        let value = String(cBuffer: host)
+                        if IPAddress.usableLocal(value) {
+                            addressed.insert(bsd)
+                            if addr.pointee.sa_family == UInt8(AF_INET) { ipByBSD[bsd] = value }
+                        }
                     }
                 }
                 cur = ifa.ifa_next
@@ -61,7 +67,7 @@ public enum InterfaceSampler {
         let out = friendly.map { bsd, disp -> InterfaceInfo in
             let ip = ipByBSD[bsd]
             return InterfaceInfo(name: disp, bsdName: bsd, ipv4: ip,
-                                 isConnected: ip != nil && running.contains(bsd))
+                                 isConnected: addressed.contains(bsd) && running.contains(bsd))
         }
         // Connected first, then by name.
         return out.sorted { ($0.isConnected ? 0 : 1, $0.name) < ($1.isConnected ? 0 : 1, $1.name) }

@@ -1,7 +1,7 @@
 //
 //  File:      Network.swift
 //  Created:   2026-06-08
-//  Updated:   2026-10-10
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Network throughput (download/upload bytes per second) sampled sudolessly
 //             via getifaddrs. Stateful: diffs interface byte counters against the
@@ -49,6 +49,12 @@ public struct NetworkSample: Sendable, Equatable, Codable {
     /// Empty on recordings / fleet frames that predate this field.
     public var interfaces: [InterfaceStat] = []
 
+    /// nil on older recordings/remote agents; [] means no usable local addresses.
+    public var localAddresses: [NetworkAddress]?
+    public var publicIPAddress: String?
+    public var publicIPStatus: PublicIPStatus?
+    public var publicIPObservedAt: Date?
+
     public init() {}
 
     /// Hand-written decoder so `interfaces` decodes as [] when absent (older recordings /
@@ -58,6 +64,10 @@ public struct NetworkSample: Sendable, Equatable, Codable {
         downloadBytesPerSec = try c.decodeIfPresent(Double.self, forKey: .downloadBytesPerSec) ?? 0
         uploadBytesPerSec   = try c.decodeIfPresent(Double.self, forKey: .uploadBytesPerSec)   ?? 0
         interfaces          = try c.decodeIfPresent([InterfaceStat].self, forKey: .interfaces)  ?? []
+        localAddresses = try c.decodeIfPresent([NetworkAddress].self, forKey: .localAddresses)
+        publicIPAddress = try c.decodeIfPresent(String.self, forKey: .publicIPAddress)
+        publicIPStatus = try c.decodeIfPresent(PublicIPStatus.self, forKey: .publicIPStatus)
+        publicIPObservedAt = try c.decodeIfPresent(Date.self, forKey: .publicIPObservedAt)
     }
 }
 
@@ -160,6 +170,7 @@ public final class NetworkSampler {
         let now = DispatchTime.now().uptimeNanoseconds
 
         var result = NetworkSample()
+        result.localAddresses = NetworkAddressSampler.sample()
 
         if previousTimeNs > 0 {
             let seconds = Double(now &- previousTimeNs) / 1_000_000_000
