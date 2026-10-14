@@ -108,4 +108,20 @@ final class SSDCounterTests: XCTestCase {
         XCTAssertNil(SSDSMARTSample.decode([], id: 1))
     }
 
+    func testNoCriticalWarningProducesNoWarningText() throws {
+        let sample = try XCTUnwrap(SSDSMARTSample.decode([UInt8](repeating: 0, count: 512), id: 1))
+        XCTAssertTrue(sample.criticalWarnings.isEmpty)
+    }
+    func testCriticalWarningsKeepTheirIndividualMeanings() throws {
+        var log = [UInt8](repeating: 0, count: 512)
+        log[0] = 1 | 2 | 4 | 8 | 16 | 32 | 128
+        let sample = try XCTUnwrap(SSDSMARTSample.decode(log, id: 1))
+        XCTAssertEqual(sample.criticalWarnings, [
+            "Spare capacity below threshold", "Temperature outside limits",
+            "Device reliability degraded", "Drive is read-only", "Memory backup failed",
+            "Persistent memory warning", "Other device warning"
+        ])
+        XCTAssertEqual(sample.remainingEndurancePercent, 100) // independent of warning bits
+    }
+
 }

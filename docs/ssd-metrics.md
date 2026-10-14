@@ -1,7 +1,8 @@
 # SSD metrics
 
 The Disk card shows SSD totals below Used. The SSD menu dropdown shows totals above
-Activity. SMART diagnostics use the same compact rows on both surfaces.
+Activity. Both surfaces show one SSD health/endurance line. Secondary SMART
+values are collapsed under that line; nonzero warnings appear as readable text.
 
 - **SSD since boot:** `IOBlockStorageDriver` Statistics `Bytes (Read)` and `Bytes
   (Write)` for physical devices whose Device Characteristics report `Medium Type =
@@ -21,9 +22,12 @@ Activity. SMART diagnostics use the same compact rows on both surfaces.
   zero critical warnings nor SMART pass status implies 100% health.
 - **Temperature:** composite temperature (bytes 1–2, little-endian kelvin).
   Zero and 65535 are unavailable.
-- **Spare:** Available Spare (byte 3); its threshold (byte 4) is in the tooltip.
-- **Warnings:** the raw Critical Warning bitmask (byte 0), explained in the tooltip.
-- **Media errors:** lifetime Media and Data Integrity Errors (offset 160).
+- **Spare:** Available Spare (byte 3); its threshold (byte 4) is in the expanded details.
+- **Warnings:** Critical Warning bits (byte 0), displayed individually in plain English
+  only when set. Unknown reserved bits show “Other device warning”.
+- **Data integrity errors:** lifetime Media and Data Integrity Errors (offset 160),
+  shown in expanded details. These are unrecovered media/ECC/CRC/LBA tag errors,
+  not all OS read/write errors. No error counters are added together.
 
 Sizes use decimal MB/GB/TB, as in the existing Disk card. An unavailable reading is
 `—`; reported zero boot bytes, errors, warnings and spare remain real zeroes.

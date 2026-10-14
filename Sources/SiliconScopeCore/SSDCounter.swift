@@ -81,6 +81,21 @@ public struct SSDSMARTSample: Sendable, Equatable, Codable, Identifiable {
     /// Remaining rated endurance, not a prediction of failure or a SMART pass score.
     public var remainingEndurancePercent: Int { max(0, 100 - Int(enduranceUsedPercent)) }
 
+    /// Each reported NVMe warning bit has its own meaning; do not fold them into a health score.
+    public var criticalWarnings: [String] {
+        let meanings: [(UInt8, String)] = [
+            (1, "Spare capacity below threshold"),
+            (2, "Temperature outside limits"),
+            (4, "Device reliability degraded"),
+            (8, "Drive is read-only"),
+            (16, "Memory backup failed"),
+            (32, "Persistent memory warning")
+        ]
+        var warnings = meanings.filter { criticalWarning & $0.0 != 0 }.map { $0.1 }
+        if criticalWarning & 0xC0 != 0 { warnings.append("Other device warning") }
+        return warnings
+    }
+
     static func decode(_ log: [UInt8], id: UInt64, name: String? = nil) -> SSDSMARTSample? {
         guard log.count == 512 else { return nil }
         let kelvin = UInt16(log[1]) | UInt16(log[2]) << 8
