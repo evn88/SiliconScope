@@ -1,7 +1,7 @@
 //
 //  File:      MenuBarMetric.swift
 //  Created:   2026-06-19
-//  Updated:   2026-09-29
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  iStat-style menu-bar glyph renderers and the per-metric dropdown panels. Glyphs are
 //             drawn to NSImage (the only reliable way to render a live status-item label) and adapt
@@ -769,6 +769,14 @@ struct SSDMenuDropdown: View {
                 MenuSectionHeader("Network Disks")
                 ForEach(net) { v in volumeRow(v) }
             }
+            Divider()
+            MenuSectionHeader("SSD since boot")
+            MenuKV(label: "Read", value: d.ssdBootReadBytes.map(formatBytes) ?? "—", color: MetricPalette.downC)
+            MenuKV(label: "Write", value: d.ssdBootWriteBytes.map(formatBytes) ?? "—", color: MetricPalette.upC)
+            SSDSMARTDetails(samples: d.ssdSMART)
+            Text("Internal SSDs · host bytes")
+                .font(Theme.font(.caption)).foregroundStyle(Theme.faint)
+                .help("IOBlockStorageDriver counters for internal SSDs matched at boot. — means unavailable, including an observed reset or device change. Activity includes all disks.")
             Divider()
             MenuSectionHeader("Activity")
             MenuKV(label: "Read", value: formatRate(d.readBytesPerSec), color: MetricPalette.downC)

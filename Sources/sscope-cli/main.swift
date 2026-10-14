@@ -1,7 +1,7 @@
 //
 //  File:      main.swift
 //  Created:   2026-06-08
-//  Updated:   2026-09-24
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Verification CLI for SiliconScopeCore. Prints sudoless power + CPU samples
 //             so we can confirm the data layer works in a real SwiftPM build.
@@ -10,6 +10,23 @@
 //
 import Foundation
 import SiliconScopeCore
+
+// A storage-only probe avoids initializing unrelated sensor samplers.
+if CommandLine.arguments.contains("--disk") {
+    let disk = DiskSampler().sample()
+    func bytes(_ value: UInt64?) -> String { value.map { String($0) + " B" } ?? "—" }
+    print("Internal SSD host bytes (IOBlockStorageDriver / NVMe SMART)")
+    print("Since boot: read \(bytes(disk.ssdBootReadBytes)), written \(bytes(disk.ssdBootWriteBytes))")
+    print("Lifetime: read \(bytes(disk.ssdLifetimeReadBytes)), written \(bytes(disk.ssdLifetimeWriteBytes))")
+    if let samples = disk.ssdSMART {
+        for sample in samples {
+            print("\(sample.deviceName ?? "SSD"): endurance remaining \(sample.remainingEndurancePercent)% (used \(sample.enduranceUsedPercent)%)")
+            print("Temperature: \(sample.temperatureCelsius.map { String(format: "%.1f°C", $0) } ?? "—"), spare: \(sample.availableSparePercent.map { "\($0)%" } ?? "—")")
+            print(String(format: "Critical warnings: 0x%02X", sample.criticalWarning) + ", media errors: \(sample.mediaErrors.map { String($0) } ?? "—")")
+        }
+    } else { print("NVMe SMART: unavailable") }
+    exit(0)
+}
 
 guard let power = PowerSampler() else {
     FileHandle.standardError.write(Data("sscope: failed to subscribe to IOReport (power)\n".utf8))

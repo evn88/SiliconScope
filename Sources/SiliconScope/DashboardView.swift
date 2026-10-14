@@ -1,7 +1,7 @@
 //
 //  File:      DashboardView.swift
 //  Created:   2026-06-08
-//  Updated:   2026-09-29
+//  Updated:   2026-10-15
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Full-window dashboard. Header (chip, cores, SoC power, battery), then
 //             CPU + GPU side by side, combined Memory|Bandwidth and Network|Disk cards
@@ -1167,6 +1167,16 @@ private struct NetworkDiskCard: View {
             Bar(label: "Used", value: disk.usedFraction,
                 detail: formatBytesOfTotal(disk.totalBytes - disk.freeBytes, disk.totalBytes),
                 encoding: .state)
+            SubLabel("SSD since boot")
+            KV(key: "Read", value: disk.ssdBootReadBytes.map(formatBytes) ?? "—", valueColor: downColor)
+            KV(key: "Write", value: disk.ssdBootWriteBytes.map(formatBytes) ?? "—", valueColor: upColor)
+            SubLabel("SSD lifetime")
+            KV(key: "Read", value: disk.ssdLifetimeReadBytes.map(formatBytes) ?? "—", valueColor: downColor)
+            KV(key: "Write", value: disk.ssdLifetimeWriteBytes.map(formatBytes) ?? "—", valueColor: upColor)
+            SSDSMARTDetails(samples: disk.ssdSMART)
+            Text("Internal SSDs · host bytes")
+                .font(Theme.font(.caption)).foregroundStyle(Theme.faint)
+                .help("Since boot: IOBlockStorageDriver counters for internal SSDs matched at boot; unavailable after an observed reset or device change. Lifetime: NVMe SMART data units (512,000 bytes), rounded by the device. — means unavailable. Activity includes all disks.")
             Spacer(minLength: 4)
             Sparkline(readHistory, color: downColor, role: .inline(height: Layout.Meter.sparklinePair))
             Sparkline(writeHistory, color: upColor, role: .inline(height: Layout.Meter.sparklinePair))
