@@ -43,8 +43,8 @@ private struct SSDSMARTDeviceDetails: View {
             } label: {
                 smartRow(showName ? (sample.deviceName ?? "SSD health") : "SSD health",
                          "\(sample.remainingEndurancePercent)% endurance")
+                    .help("Remaining rated endurance = max(0, 100 − NVMe Percentage Used). A vendor estimate, not a failure prediction; 0% does not mean the drive has failed. Expand for SMART details.")
             }
-            .help("Remaining rated endurance = max(0, 100 − NVMe Percentage Used). A vendor estimate, not a failure prediction; 0% does not mean the drive has failed. Expand for SMART details.")
             .tint(Theme.dim)
             ForEach(sample.criticalWarnings, id: \.self) { warning in
                 Text(warning).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
