@@ -21,12 +21,16 @@ usual no-outbound-requests rule; the local-address feature needs no external ser
 It requires maintainer acceptance of that exception before merge.
 
 Public lookup runs asynchronously, separately from metric sampling. Stable routes
-refresh every 10 minutes; changed routes can refresh after at least 60 seconds since
+refresh every 10 minutes, including retries after a failed attempt (no immediate retry loop);
+changed routes can refresh after at least 60 seconds since
 the last attempt. A disabled option, missing route, lost network demand, changed
 local route/address set or failed refresh clears the old value. Late results from an
 old route are discarded. A five-second timeout, no redirect following, ephemeral
 session without cookies/cache, bounded JSON decoding and literal IPv4/IPv6 validation
-limit the request. No geolocation or network-provider metadata is requested.
+limit the request. There is at most one in-flight lookup and no separate polling timer:
+the existing sampling tick checks the monotonic-clock deadline, and UI rendering never
+starts requests. With lookup disabled or no Network demand, route fingerprint work is skipped.
+No geolocation or network-provider metadata is requested.
 
 The value is the exit address **seen by ipify**, not an assertion about every app's
 route. A VPN may provide it; split tunneling, proxies and separate IPv4/IPv6 routes

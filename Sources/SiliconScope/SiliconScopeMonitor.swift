@@ -158,7 +158,8 @@ final class SiliconScopeMonitor {
                 let sampled = await Task.detached(priority: .utility) {
                     sampler.sample(interval: 0.2, demand: demand)
                 }.value
-                guard let self else { return }
+                // A stopped/replaying monitor must not start an optional lookup after sampling returns.
+                guard let self, !Task.isCancelled else { return }
                 // Opt-in runtime API: pull the key each tick and lazily start/stop polling.
                 if UserDefaults.standard.bool(forKey: "aiRuntimeAPIEnabled") {
                     self.startAPIPollingIfNeeded()
@@ -208,6 +209,7 @@ final class SiliconScopeMonitor {
         loopTask?.cancel()
         loopTask = nil
         stopAPIPolling()
+        publicIPAddress.stop()
         endFocus()
         // C5: drop rate state so a later restart doesn't diff across the pause.
         engine.reset(); lastIngest = nil

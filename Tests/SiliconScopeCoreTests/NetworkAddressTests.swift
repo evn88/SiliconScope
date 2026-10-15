@@ -96,6 +96,54 @@ final class NetworkAddressTests: XCTestCase {
         XCTAssertEqual(NetworkAddressSampler.routeFingerprint(nil), "")
     }
 
+    func testRepeatedSamplingKeepsCachedAddressUntilTenMinuteRefresh() throws {
+        var cache = PublicIPCache()
+        let first = try XCTUnwrap(cache.update(enabled: true, demanded: true, path: "en0", now: 0))
+        cache.finish(first, address: "198.51.100.9")
+        for tick in 1..<600 {
+            XCTAssertNil(cache.update(enabled: true, demanded: true, path: "en0", now: Double(tick)))
+            XCTAssertEqual(cache.address, "198.51.100.9")
+            XCTAssertEqual(cache.status, .available)
+        }
+        XCTAssertNotNil(cache.update(enabled: true, demanded: true, path: "en0", now: 600))
+    }
+
+    func testRepeatedFailuresBackOffForTenMinutes() {
+        var cache = PublicIPCache()
+        var attempts: [Int] = []
+        for tick in 0...1800 {
+            if let id = cache.update(enabled: true, demanded: true, path: "en0", now: Double(tick)) {
+                attempts.append(tick)
+                cache.finish(id, address: nil)
+            }
+        }
+        XCTAssertEqual(attempts, [0, 600, 1200, 1800])
+    }
+
+    func testRouteFlappingIsLimitedToOneAttemptPerMinute() {
+        var cache = PublicIPCache()
+        var attempts: [Int] = []
+        for tick in 0...180 {
+            let route = tick.isMultiple(of: 2) ? "en0" : "utun3"
+            if let id = cache.update(enabled: true, demanded: true, path: route, now: Double(tick)) {
+                attempts.append(tick)
+                cache.finish(id, address: nil)
+            }
+        }
+        XCTAssertEqual(attempts, [0, 60, 120, 180])
+    }
+
+    func testLostDemandDiscardsInFlightResultAndKeepsCooldown() throws {
+        var cache = PublicIPCache()
+        let id = try XCTUnwrap(cache.update(enabled: true, demanded: true, path: "en0", now: 0))
+        XCTAssertNil(cache.update(enabled: true, demanded: false, path: "en0", now: 1))
+        XCTAssertNil(cache.requestID)
+        cache.finish(id, address: "198.51.100.9")
+        XCTAssertNil(cache.address)
+        XCTAssertNil(cache.update(enabled: true, demanded: true, path: "en0", now: 59))
+        XCTAssertNotNil(cache.update(enabled: true, demanded: true, path: "en0", now: 60))
+    }
+
     func testClientUsesMockTransportWithoutExternalLookup() async {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockIPProtocol.self]

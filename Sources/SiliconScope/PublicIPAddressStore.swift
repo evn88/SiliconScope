@@ -14,8 +14,16 @@ import SiliconScopeCore
     private var task: Task<Void, Never>?
     private var taskID: UUID?
     private var observedAt: Date?
+    /// Sampling can stop for replay or shutdown before another demand update arrives.
+    func stop() {
+        task?.cancel(); task = nil; taskID = nil
+        _ = cache.update(enabled: false, demanded: false, path: "", now: 0)
+        observedAt = nil
+    }
+
     func update(enabled: Bool, demanded: Bool, network: inout NetworkSample) {
-        let path = NetworkAddressSampler.routeFingerprint(network.localAddresses)
+        // No address sorting/string construction while lookup is off or Network is not demanded.
+        let path = enabled && demanded ? NetworkAddressSampler.routeFingerprint(network.localAddresses) : ""
         let next = cache.update(enabled: enabled, demanded: demanded, path: path,
                                 now: Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000)
         if taskID != cache.requestID { task?.cancel(); task = nil; taskID = nil }
