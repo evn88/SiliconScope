@@ -771,12 +771,10 @@ struct SSDMenuDropdown: View {
             }
             Divider()
             MenuSectionHeader("SSD since boot")
+                .help("Internal SSD host bytes from IOBlockStorageDriver counters matched at boot. — means unavailable, including an observed reset or device change. Activity includes all disks.")
             MenuKV(label: "Read", value: d.ssdBootReadBytes.map(formatBytes) ?? "—", color: MetricPalette.downC)
             MenuKV(label: "Write", value: d.ssdBootWriteBytes.map(formatBytes) ?? "—", color: MetricPalette.upC)
             SSDSMARTDetails(samples: d.ssdSMART)
-            Text("Internal SSDs · host bytes")
-                .font(Theme.font(.caption)).foregroundStyle(Theme.faint)
-                .help("IOBlockStorageDriver counters for internal SSDs matched at boot. — means unavailable, including an observed reset or device change. Activity includes all disks.")
             Divider()
             MenuSectionHeader("Activity")
             MenuKV(label: "Read", value: formatRate(d.readBytesPerSec), color: MetricPalette.downC)

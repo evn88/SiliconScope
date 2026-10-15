@@ -42,10 +42,10 @@ private struct SSDSMARTDeviceDetails: View {
                 }.padding(.top, Space.hair)
             } label: {
                 smartRow(showName ? (sample.deviceName ?? "SSD health") : "SSD health",
-                         "\(sample.remainingEndurancePercent)% endurance")
+                         "\(sample.remainingEndurancePercent)% remaining")
                     .help("Remaining rated endurance = max(0, 100 − NVMe Percentage Used). A vendor estimate, not a failure prediction; 0% does not mean the drive has failed. Expand for SMART details.")
             }
-            .tint(Theme.dim)
+            .disclosureGroupStyle(SMARTDisclosureStyle())
             ForEach(sample.criticalWarnings, id: \.self) { warning in
                 Text(warning).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
             }
@@ -59,4 +59,41 @@ private func smartRow(_ label: String, _ value: String) -> some View {
         Spacer(minLength: Space.hair)
         Text(value).monospacedDigit().foregroundStyle(Theme.text)
     }.font(Theme.font(.caption))
+}
+
+
+private struct SMARTDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        SMARTDisclosureBody(configuration: configuration)
+    }
+}
+
+private struct SMARTDisclosureBody: View {
+    let configuration: DisclosureGroupStyleConfiguration
+    @FocusState private var keyboardFocused: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.hair) {
+            Button { configuration.isExpanded.toggle() } label: {
+                HStack(spacing: Space.hair) {
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .foregroundStyle(Theme.dim)
+                    configuration.label
+                }
+                .contentShape(Rectangle())
+                .padding(.vertical, 1)
+                .overlay(alignment: .bottom) {
+                    if keyboardFocused {
+                        Rectangle().fill(Theme.dim.opacity(0.65)).frame(height: 1)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .focusEffectDisabled()
+            .focused($keyboardFocused)
+            .accessibilityIdentifier("ssd-smart-disclosure")
+            .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint("Show or hide SSD SMART details")
+            if configuration.isExpanded { configuration.content }
+        }
+    }
 }
