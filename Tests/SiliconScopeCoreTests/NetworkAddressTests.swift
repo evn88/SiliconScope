@@ -85,4 +85,39 @@ final class NetworkAddressTests: XCTestCase {
         XCTAssertNil(cache.address)
         XCTAssertEqual(cache.status, .off)
     }
+    func testTunnelChangesInvalidateCacheWithoutChangingPrimaryInterface() {
+        let physical = NetworkAddress(interface: "en0", address: "192.0.2.2", isIPv6: false, isPrimary: true)
+        let tunnel = NetworkAddress(interface: "utun3", address: "10.0.0.2", isIPv6: false, isPrimary: false)
+        XCTAssertNotEqual(NetworkAddressSampler.routeFingerprint([physical]),
+                          NetworkAddressSampler.routeFingerprint([physical, tunnel]))
+        XCTAssertEqual(NetworkAddressSampler.routeFingerprint([tunnel, physical]),
+                       NetworkAddressSampler.routeFingerprint([physical, tunnel]))
+        XCTAssertEqual(NetworkAddressSampler.routeFingerprint([tunnel]), "")
+        XCTAssertEqual(NetworkAddressSampler.routeFingerprint(nil), "")
+    }
+
+    func testClientUsesMockTransportWithoutExternalLookup() async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockIPProtocol.self]
+        let result = await PublicIPClient.lookup(configuration: configuration)
+        XCTAssertEqual(result, "198.51.100.9")
+    }
+
+}
+
+
+private final class MockIPProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard request.url == PublicIPClient.endpoint else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL)); return
+        }
+        let response = HTTPURLResponse(url: PublicIPClient.endpoint, statusCode: 200,
+                                       httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(#"{"ip":"198.51.100.9"}"#.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

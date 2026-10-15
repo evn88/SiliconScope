@@ -15,7 +15,7 @@ import SiliconScopeCore
     private var taskID: UUID?
     private var observedAt: Date?
     func update(enabled: Bool, demanded: Bool, network: inout NetworkSample) {
-        let path = (network.localAddresses ?? []).filter(\.isPrimary).map(\.id).sorted().joined(separator: "|")
+        let path = NetworkAddressSampler.routeFingerprint(network.localAddresses)
         let next = cache.update(enabled: enabled, demanded: demanded, path: path,
                                 now: Double(DispatchTime.now().uptimeNanoseconds) / 1_000_000_000)
         if taskID != cache.requestID { task?.cancel(); task = nil; taskID = nil }

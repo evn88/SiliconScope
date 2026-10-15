@@ -81,6 +81,14 @@ public enum NetworkAddressSampler {
         }
         return ordered(addresses)
     }
+    /// Secondary/tunnel address changes invalidate the exit-IP cache even when the
+    /// SystemConfiguration primary interface stays on the physical transport.
+    public static func routeFingerprint(_ addresses: [NetworkAddress]?) -> String {
+        guard let addresses, addresses.contains(where: \.isPrimary) else { return "" }
+        return addresses.map { ($0.isPrimary ? "primary:" : "other:") + $0.id }
+            .sorted().joined(separator: "|")
+    }
+
     static func ordered(_ addresses: [NetworkAddress]) -> [NetworkAddress] {
         var seen = Set<String>()
         return addresses.filter { seen.insert($0.id).inserted }.sorted {

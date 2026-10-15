@@ -64,7 +64,11 @@ public enum PublicIPClient {
         return reply.ip
     }
     public static func lookup() async -> String? {
-        let config = URLSessionConfiguration.ephemeral
+        await lookup(configuration: .ephemeral)
+    }
+
+    // Injectable configuration for URLProtocol tests; the application uses the ephemeral default.
+    static func lookup(configuration config: URLSessionConfiguration) async -> String? {
         config.timeoutIntervalForRequest = 5
         config.timeoutIntervalForResource = 5
         config.httpCookieStorage = nil
