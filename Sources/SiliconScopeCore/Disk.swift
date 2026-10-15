@@ -42,8 +42,7 @@ public final class DiskSampler {
     private var ssdTracker = SSDCounterTracker()
     private var cachedSMART: [SSDSMARTSample]?
     private var cachedLifetime: (UInt64?, UInt64?) = (nil, nil)
-    private var lifetimeIDs = Set<UInt64>()
-    private var lastSMARTSampleNs: UInt64 = 0
+    private var smartRefresh = SSDSMARTRefreshPolicy()
     private var previousRead: UInt64 = 0
     private var previousWrite: UInt64 = 0
     private var previousTimeNs: UInt64 = 0
@@ -62,21 +61,13 @@ public final class DiskSampler {
     public func sample() -> DiskSample {
         var result = DiskSample()
 
-        let (read, write) = Self.ioBytes()
-        let devices = Self.internalSSDs()
+        let (read, write, devices) = Self.storageBytes()
         let boot = ssdTracker.update(devices.map { $0.counter })
         result.ssdBootReadBytes = boot?.read
         result.ssdBootWriteBytes = boot?.write
         let ids = Set(devices.map { $0.counter.id })
-        if ids != lifetimeIDs {
-            cachedLifetime = (nil, nil)
-            cachedSMART = nil
-            lastSMARTSampleNs = 0
-            lifetimeIDs = ids
-        }
         let smartNow = DispatchTime.now().uptimeNanoseconds
-        if lastSMARTSampleNs == 0 || smartNow - lastSMARTSampleNs >= 30_000_000_000 {
-            lastSMARTSampleNs = smartNow
+        if smartRefresh.shouldRefresh(deviceIDs: ids, now: smartNow) {
             let smart = Self.lifetimeBytes(devices)
             cachedLifetime = (smart.0, smart.1)
             cachedSMART = smart.2
@@ -115,45 +106,30 @@ public final class DiskSampler {
         return (total, free)
     }
 
-    private static func ioBytes() -> (UInt64, UInt64) {
-        var iterator = io_iterator_t()
-        guard IOServiceGetMatchingServices(kIOMainPortDefault,
-                                           IOServiceMatching("IOBlockStorageDriver"),
-                                           &iterator) == KERN_SUCCESS else { return (0, 0) }
-        defer { IOObjectRelease(iterator) }
-
-        var read: UInt64 = 0
-        var write: UInt64 = 0
-        var entry = IOIteratorNext(iterator)
-        while entry != IO_OBJECT_NULL {
-            var properties: Unmanaged<CFMutableDictionary>?
-            if IORegistryEntryCreateCFProperties(entry, &properties, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-               let dict = properties?.takeRetainedValue() as NSDictionary?,
-               let stats = dict["Statistics"] as? NSDictionary {
-                read += (stats["Bytes (Read)"] as? NSNumber)?.uint64Value ?? 0
-                write += (stats["Bytes (Write)"] as? NSNumber)?.uint64Value ?? 0
-            }
-            IOObjectRelease(entry)
-            entry = IOIteratorNext(iterator)
-        }
-        return (read, write)
-    }
-
     private struct SSDDevice {
         var service: io_service_t
         var name: String?
         var counter: SSDCounter
     }
 
-    private static func internalSSDs() -> [SSDDevice] {
+    /// One enumeration and one Statistics read per driver serve both activity and SSD totals.
+    /// Rediscover devices each tick; no cached IOKit handles or device classifications can go stale.
+    private static func storageBytes() -> (UInt64, UInt64, [SSDDevice]) {
         var iterator = io_iterator_t()
         guard IOServiceGetMatchingServices(kIOMainPortDefault,
-            IOServiceMatching("IOBlockStorageDriver"), &iterator) == KERN_SUCCESS else { return [] }
+            IOServiceMatching("IOBlockStorageDriver"), &iterator) == KERN_SUCCESS else { return (0, 0, []) }
         defer { IOObjectRelease(iterator) }
+        var read: UInt64 = 0, write: UInt64 = 0
         var devices: [SSDDevice] = []
         var driver = IOIteratorNext(iterator)
         while driver != IO_OBJECT_NULL {
             defer { IOObjectRelease(driver); driver = IOIteratorNext(iterator) }
+            let stats = IORegistryEntryCreateCFProperty(driver, "Statistics" as CFString,
+                kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSDictionary
+            let driverRead = (stats?["Bytes (Read)"] as? NSNumber)?.uint64Value
+            let driverWrite = (stats?["Bytes (Write)"] as? NSNumber)?.uint64Value
+            read += driverRead ?? 0
+            write += driverWrite ?? 0
             var parent = io_registry_entry_t()
             guard IORegistryEntryGetParentEntry(driver, kIOServicePlane, &parent) == KERN_SUCCESS else { continue }
             defer { IOObjectRelease(parent) }
@@ -168,14 +144,11 @@ public final class DiskSampler {
             guard IORegistryEntryGetRegistryEntryID(driver, &id) == KERN_SUCCESS else { continue }
             let atBoot = IORegistryEntryCreateCFProperty(driver, "IOMatchedAtBoot" as CFString,
                 kCFAllocatorDefault, 0)?.takeRetainedValue() as? Bool == true
-            let stats = IORegistryEntryCreateCFProperty(driver, "Statistics" as CFString,
-                kCFAllocatorDefault, 0)?.takeRetainedValue() as? NSDictionary
             IOObjectRetain(parent)
             devices.append(SSDDevice(service: parent, name: device["Product Name"] as? String, counter: SSDCounter(id: id, atBoot: atBoot,
-                read: (stats?["Bytes (Read)"] as? NSNumber)?.uint64Value,
-                write: (stats?["Bytes (Write)"] as? NSNumber)?.uint64Value)))
+                read: driverRead, write: driverWrite)))
         }
-        return devices
+        return (read, write, devices)
     }
 
     private static func lifetimeBytes(_ devices: [SSDDevice]) -> (UInt64?, UInt64?, [SSDSMARTSample]?) {

@@ -8,6 +8,20 @@
 //
 import Foundation
 
+/// SMART refreshes share the existing disk sampling loop; no additional timer or retained service.
+struct SSDSMARTRefreshPolicy {
+    private var deviceIDs: Set<UInt64>?
+    private var lastSample: UInt64?
+
+    mutating func shouldRefresh(deviceIDs ids: Set<UInt64>, now: UInt64) -> Bool {
+        if deviceIDs == ids, let lastSample, now >= lastSample,
+           now - lastSample < 30_000_000_000 { return false }
+        deviceIDs = ids
+        lastSample = now
+        return true
+    }
+}
+
 struct SSDCounter: Equatable {
     var id: UInt64
     var atBoot: Bool

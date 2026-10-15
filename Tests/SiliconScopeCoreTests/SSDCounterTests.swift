@@ -10,6 +10,32 @@ import XCTest
 @testable import SiliconScopeCore
 
 final class SSDCounterTests: XCTestCase {
+    func testRepeatedDiskTicksDoNotRefreshSMARTBeforeThirtySeconds() {
+        var policy = SSDSMARTRefreshPolicy()
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [1], now: 1))
+        for second in 1..<30 {
+            XCTAssertFalse(policy.shouldRefresh(deviceIDs: [1], now: UInt64(second) * 1_000_000_000))
+        }
+        XCTAssertFalse(policy.shouldRefresh(deviceIDs: [1], now: 30_000_000_000))
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [1], now: 30_000_000_001))
+    }
+
+    func testDeviceRemovalAndReplacementRefreshSMARTImmediately() {
+        var policy = SSDSMARTRefreshPolicy()
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [1], now: 1))
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [], now: 2))
+        XCTAssertFalse(policy.shouldRefresh(deviceIDs: [], now: 3))
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [2], now: 4))
+        XCTAssertFalse(policy.shouldRefresh(deviceIDs: [2], now: 5))
+    }
+
+    func testSMARTRefreshAfterLongSamplingPauseOrClockRollback() {
+        var policy = SSDSMARTRefreshPolicy()
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [1], now: 10_000_000_000))
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [1], now: 100_000_000_000))
+        XCTAssertTrue(policy.shouldRefresh(deviceIDs: [1], now: 1))
+    }
+
     private func counter(_ read: UInt64? = 100, _ write: UInt64? = 200,
                          id: UInt64 = 1, atBoot: Bool = true) -> SSDCounter {
         SSDCounter(id: id, atBoot: atBoot, read: read, write: write)

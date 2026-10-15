@@ -51,6 +51,24 @@ and devices without the NVMe plugin return unavailable SMART. Boot totals can st
 be available on internal SATA SSDs. Fleet fields are unchanged; older recordings
 lack the new optional DiskSample fields and decode as unknown.
 
+## Sampling cost
+
+Disk activity and SSD boot totals share one IOBlockStorageDriver enumeration and one
+Statistics property read per driver per tick. Device identity/classification is checked
+again each tick rather than caching IOKit handles across removal or replacement. Driver,
+parent, iterator and SMART-plugin references are released after use. Sampling runs in
+SystemSampler's background task, only with disk demand; the UI reads snapshots.
+SMART refresh uses the existing disk loop, not another timer. Small SMART-log conversions
+remain on the 30-second cadence rather than introducing more persistent caches.
+
+A short comparison on MacBookAir10,1 / M1 / macOS 27.0.1 used separately compiled `-O`
+before/after samplers, one warm-up, then three batches of 200 tight samples per version.
+Mean process CPU time per warm sample was 0.272 ms before and 0.207 ms after; mean wall
+time was 0.276 ms and 0.211 ms. Both versions reported boot counters and SMART available.
+These runs exclude initial SMART/capacity reads and are not an energy or long-term
+background-CPU measurement. Other hardware and hot-unplug behavior remain unmeasured;
+device-change, cadence, reset and overflow behavior have fixture coverage.
+
 ## Source references
 
 - [Apple IOBlockStorageDriver](https://github.com/apple-oss-distributions/IOStorageFamily/blob/main/IOBlockStorageDriver.cpp)
