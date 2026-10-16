@@ -50,6 +50,7 @@ struct NetworkAddressesView: View {
             }
         }
         .font(Theme.font(.caption)).tint(Theme.dim)
+        .disclosureGroupStyle(CompactDisclosureStyle())
     }
     private func addressDetails(_ addresses: [NetworkAddress]?) -> some View {
         VStack(alignment: .trailing, spacing: Space.hair) {

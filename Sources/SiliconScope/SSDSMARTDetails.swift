@@ -1,7 +1,7 @@
 //
 //  File:      SSDSMARTDetails.swift
 //  Created:   2026-10-15
-//  Updated:   2026-10-15
+//  Updated:   2026-10-16
 //  Developer: SiliconScope contributors
 //  Overview:  Compact SSD health line with optional SMART details.
 //  Notes:     Health is remaining rated endurance, never a failure prediction.
@@ -46,6 +46,7 @@ private struct SSDSMARTDeviceDetails: View {
                     .help("Remaining rated endurance = max(0, 100 − NVMe Percentage Used). A vendor estimate, not a failure prediction; 0% does not mean the drive has failed. Expand for SMART details.")
             }
             .tint(Theme.dim)
+            .disclosureGroupStyle(CompactDisclosureStyle())
             ForEach(sample.criticalWarnings, id: \.self) { warning in
                 Text(warning).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
             }

@@ -718,7 +718,7 @@ struct NETMenuDropdown: View {
                     .font(Theme.font(.caption)).foregroundStyle(Theme.faint)
             }
             Divider()
-            MenuActionsFooter()
+            MenuActionsFooter(focusSettingsOnOpen: true)
         }
         .padding(.horizontal, Space.section).padding(.vertical, Space.card).frame(width: Layout.Surface.dropdownWidth).background(Theme.bg).foregroundStyle(Theme.text)
     }
