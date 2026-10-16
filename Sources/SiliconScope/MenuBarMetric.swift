@@ -545,16 +545,24 @@ struct OpenDashboardButton: View {
 /// Footer for the per-metric dropdowns: Settings + Open Dashboard, so the combined "SS" menu-bar
 /// item isn't required to reach them (it can be hidden via Settings → "Combined (SS)").
 struct MenuActionsFooter: View {
+    var focusSettingsOnOpen = false
+    @FocusState private var settingsFocused: Bool
+
     var body: some View {
         HStack(spacing: Space.row) {
             Button { openAppSettings() } label: {
                 Label("Settings", systemImage: "gearshape")
             }
             .buttonStyle(PopoverButtonStyle())
+            .focused($settingsFocused)
             Button { openMainDashboard() } label: {
                 Label("Dashboard", systemImage: "macwindow")
             }
             .buttonStyle(PopoverButtonStyle(prominent: true))
+        }
+        .defaultFocus($settingsFocused, focusSettingsOnOpen)
+        .onAppear {
+            if focusSettingsOnOpen { settingsFocused = true }
         }
     }
 }
@@ -770,13 +778,19 @@ struct SSDMenuDropdown: View {
                 ForEach(net) { v in volumeRow(v) }
             }
             Divider()
+            MenuSectionHeader("SSD since boot")
+                .help("Internal SSD host bytes from IOBlockStorageDriver counters matched at boot. — means unavailable, including an observed reset or device change. Activity includes all disks.")
+            MenuKV(label: "Read", value: d.ssdBootReadBytes.map(formatBytes) ?? "—", color: MetricPalette.downC)
+            MenuKV(label: "Write", value: d.ssdBootWriteBytes.map(formatBytes) ?? "—", color: MetricPalette.upC)
+            SSDSMARTDetails(samples: d.ssdSMART)
+            Divider()
             MenuSectionHeader("Activity")
             MenuKV(label: "Read", value: formatRate(d.readBytesPerSec), color: MetricPalette.downC)
             Sparkline(monitor.history.diskRead, color: MetricPalette.downC, role: .inline(height: Layout.Meter.sparklinePair))
             MenuKV(label: "Write", value: formatRate(d.writeBytesPerSec), color: MetricPalette.upC)
             Sparkline(monitor.history.diskWrite, color: MetricPalette.upC, role: .inline(height: Layout.Meter.sparklinePair))
             Divider()
-            MenuActionsFooter()
+            MenuActionsFooter(focusSettingsOnOpen: true)
         }
         .padding(.horizontal, Space.section).padding(.vertical, Space.card).frame(width: Layout.Surface.dropdownWidth).background(Theme.bg).foregroundStyle(Theme.text)
     }
