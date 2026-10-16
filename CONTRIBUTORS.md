@@ -66,6 +66,10 @@ because people measured on their own hardware carefully enough that nothing had 
 - **[@TianjinAI](https://github.com/TianjinAI)** — oMLX shows the model that is loaded, not the
   first one installed ([#67](https://github.com/kennss/SiliconScope/pull/67)), and pointed out that LM Studio's path had the same flaw
   ([#66](https://github.com/kennss/SiliconScope/issues/66)).
+- **[@evn88](https://github.com/evn88)** — the internal SSD's reads and writes since boot and over its
+  lifetime, and its NVMe SMART readings — remaining rated endurance, temperature, spare capacity,
+  media errors and each critical warning by name, never folded into a health score — read-only,
+  with the disk sampling made cheaper along the way ([#77](https://github.com/kennss/SiliconScope/pull/77)).
 - **[@ticlazau](https://github.com/ticlazau)** — the per-interface network breakdown: each
   interface's own throughput under the totals, names cached, VPN tunnels kept out of the totals so
   they no longer count the same bytes twice ([#74](https://github.com/kennss/SiliconScope/pull/74)). And M4 Pro GPU sensor readings,
