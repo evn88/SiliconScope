@@ -28,7 +28,7 @@ struct NetworkAddressesView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 } label: {
                     HStack(spacing: Space.row) {
-                        Text(iface.name).foregroundStyle(Theme.dim).lineLimit(1)
+                        CompactDisclosureTitle(iface.name).lineLimit(1)
                         Text(network.addresses(for: iface.bsdName)?.first?.address ?? "—")
                             .foregroundStyle(Theme.text).lineLimit(1).truncationMode(.middle)
                             .frame(maxWidth: .infinity, alignment: .trailing)

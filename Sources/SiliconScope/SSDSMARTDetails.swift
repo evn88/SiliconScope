@@ -56,7 +56,7 @@ private struct SSDSMARTDeviceDetails: View {
 
 private func smartRow(_ label: String, _ value: String) -> some View {
     HStack(spacing: Space.row) {
-        Text(label).foregroundStyle(Theme.dim).lineLimit(1).truncationMode(.middle)
+        CompactDisclosureTitle(label).lineLimit(1).truncationMode(.middle)
         Spacer(minLength: Space.hair)
         Text(value).monospacedDigit().foregroundStyle(Theme.text)
     }.font(Theme.font(.caption))
