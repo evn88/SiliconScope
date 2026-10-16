@@ -1,47 +1,28 @@
-# Network addresses
+# Local network addresses
 
-Network shows compact Local IP and Public IP rows in the dashboard and menu dropdown.
-Expand Local IP for all usable running interfaces, full copyable IPv6 addresses and
-public-IP observation time. IPv6 values wrap instead of being clipped.
+Network's existing interface rows show that interface's local address, associated by
+BSD name (for example en0), in both the dashboard and menu dropdown. Expand a row
+for its full copyable IPv4/IPv6 addresses and throughput. Long addresses are shortened
+only in collapsed rows and wrap in details. More addresses includes interfaces not in
+the two physical throughput rows, including VPN tunnels. No address is selected from
+another interface merely because it carries a default route.
 
-Local addresses come from `getifaddrs` (`IFF_UP`, `IFF_RUNNING`, non-loopback).
-SystemConfiguration `State:/Network/Global/IPv4` and `IPv6` `PrimaryInterface` identify
-the default-route interface for each family. VPN interfaces participate in address
-selection even though the existing throughput totals exclude tunnels to avoid double
-counting. Default-route addresses come first, IPv4 before IPv6; other usable addresses
-remain in details. No default-route address means the headline is unknown, not a claim
-that the Internet is reachable. Loopback, unspecified, multicast and link-local-only
-addresses are excluded. Addresses and route properties are read on each network tick;
-they are not carried forward across failures or disconnects.
+Addresses come from the network sampler's existing getifaddrs walk, using up/running,
+non-loopback interfaces. Loopback, unspecified, multicast and link-local-only
+addresses are excluded. The same walk supplies physical byte counters; tunnels stay
+excluded from throughput totals to avoid double counting. One SystemConfiguration
+store is retained per sampler; primary IPv4/IPv6 interface names are refreshed on
+the existing five-second cadence. There is no extra timer or external request.
+Device/network changes may take up to that cadence to change default-route labels;
+addresses themselves are read on each demanded network sample.
 
-Public IP is **off by default**. The Settings toggle explicitly names **ipify** and says
-that enabling it contacts `https://api64.ipify.org?format=json`. ipify sees the source
-public IP of that HTTPS connection. This is a requested exception to the project's
-usual no-outbound-requests rule; the local-address feature needs no external service.
-It requires maintainer acceptance of that exception before merge.
+Views only read snapshot data and never query live interfaces. Older recordings and
+remote frames without localAddresses show unknown (—); an empty list means none
+reported. Address scan failure returns unknown. Old experimental public-IP recording
+fields are ignored and not reencoded. Fleet wire fields and CSV columns are unchanged;
+new recordings retain observed local addresses and should be treated accordingly.
 
-Public lookup runs asynchronously, separately from metric sampling. Stable routes
-refresh every 10 minutes, including retries after a failed attempt (no immediate retry loop);
-changed routes can refresh after at least 60 seconds since
-the last attempt. A disabled option, missing route, lost network demand, changed
-local route/address set or failed refresh clears the old value. Late results from an
-old route are discarded. A five-second timeout, no redirect following, ephemeral
-session without cookies/cache, bounded JSON decoding and literal IPv4/IPv6 validation
-limit the request. There is at most one in-flight lookup and no separate polling timer:
-the existing sampling tick checks the monotonic-clock deadline, and UI rendering never
-starts requests. With lookup disabled or no Network demand, route fingerprint work is skipped.
-No geolocation or network-provider metadata is requested.
-
-The value is the exit address **seen by ipify**, not an assertion about every app's
-route. A VPN may provide it; split tunneling, proxies and separate IPv4/IPv6 routes
-can have different exits. Offline/error values show “—”; disabled lookup shows “Off”.
-Full addresses and check time are in details. Requests and addresses are not logged.
-
-New NetworkSample fields are optional. Older recordings and remote agents show unknown
-addresses; Fleet wire fields are unchanged. New `.ssrec` recordings retain observed
-addresses locally, like other snapshot fields. CSV columns are unchanged. Treat an
-exported recording as containing these addresses.
-
-Tests and public screenshots use documentation addresses (192.0.2.0/24,
-198.51.100.0/24 and 2001:db8::/32). No real public lookup is needed to test decoding,
-refresh policy, route invalidation or layout.
+No public-IP model, service, store or setting remains. Public screenshots and fixtures
+use documentation addresses only. No runtime CPU or energy improvement is claimed;
+the duplicate getifaddrs walk and per-tick SystemConfiguration store creation were
+removed by sharing the existing sampler path.

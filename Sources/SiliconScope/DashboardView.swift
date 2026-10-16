@@ -1,7 +1,7 @@
 //
 //  File:      DashboardView.swift
 //  Created:   2026-06-08
-//  Updated:   2026-10-15
+//  Updated:   2026-10-16
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Full-window dashboard. Header (chip, cores, SoC power, battery), then
 //             CPU + GPU side by side, combined Memory|Bandwidth and Network|Disk cards
@@ -1139,16 +1139,6 @@ private struct NetworkDiskCard: View {
             SubLabel("Network", menuBarPin: menuBarItems.pin(.network))
             KV(key: "↓ Download", value: formatRate(network.downloadBytesPerSec), valueColor: downColor)
             KV(key: "↑ Upload", value: formatRate(network.uploadBytesPerSec), valueColor: upColor)
-            // Per-interface breakdown — only shown when more than one interface is active, or when
-            // the single active interface has a name that adds information (i.e. not "Total" alone).
-            // Capped to at most 2 rows to fit the fixed-height card layout.
-            if network.interfaces.count > 1 ||
-                (network.interfaces.count == 1 && !network.interfaces[0].name.isEmpty) {
-                ForEach(network.interfaces.prefix(2)) { iface in
-                    KV(key: "  \(iface.name)",
-                       value: "↓ \(formatRate(iface.downloadBytesPerSec))  ↑ \(formatRate(iface.uploadBytesPerSec))")
-                }
-            }
             NetworkAddressesView(network: network)
             Spacer(minLength: 4)
             Sparkline(downHistory, color: downColor, role: .inline(height: Layout.Meter.sparklinePair))

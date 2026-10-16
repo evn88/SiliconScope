@@ -1,7 +1,7 @@
 //
 //  File:      SiliconScopeMonitor.swift
 //  Created:   2026-06-08
-//  Updated:   2026-10-15
+//  Updated:   2026-09-24
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Observable view-model that drives the UI. Polls SystemSampler on a
 //             background task ~once per second and publishes the latest snapshot plus
@@ -52,7 +52,6 @@ final class SiliconScopeMonitor {
     var memorySwapOutRate: Double { engine.memorySwapOutRate }
     var memoryCompressionRate: Double { engine.memoryCompressionRate }
 
-    private let publicIPAddress = PublicIPAddressStore()
     private let sampler = SystemSampler()
     private var loopTask: Task<Void, Never>?
 
@@ -158,8 +157,7 @@ final class SiliconScopeMonitor {
                 let sampled = await Task.detached(priority: .utility) {
                     sampler.sample(interval: 0.2, demand: demand)
                 }.value
-                // A stopped/replaying monitor must not start an optional lookup after sampling returns.
-                guard let self, !Task.isCancelled else { return }
+                guard let self else { return }
                 // Opt-in runtime API: pull the key each tick and lazily start/stop polling.
                 if UserDefaults.standard.bool(forKey: "aiRuntimeAPIEnabled") {
                     self.startAPIPollingIfNeeded()
@@ -169,8 +167,6 @@ final class SiliconScopeMonitor {
                 // Groups outside `demand` come back zero-initialised; keep the last real value
                 // for them so the frame the window reopens on is not a wall of zeros.
                 var snap = sampled.carryingForward(self.snapshot, measured: demand)
-                self.publicIPAddress.update(enabled: UserDefaults.standard.bool(forKey: "publicIPLookupEnabled"),
-                                            demanded: demand.contains(.network), network: &snap.network)
                 snap.runtimeAPI = self.effectiveRuntimeAPI()    // C4 staleness applied
                 // Advance the derivation engine first (folds peaks, rates, history), then publish
                 // the snapshot — so the Observation-triggered re-render reads fresh engine state.
@@ -209,7 +205,6 @@ final class SiliconScopeMonitor {
         loopTask?.cancel()
         loopTask = nil
         stopAPIPolling()
-        publicIPAddress.stop()
         endFocus()
         // C5: drop rate state so a later restart doesn't diff across the pause.
         engine.reset(); lastIngest = nil

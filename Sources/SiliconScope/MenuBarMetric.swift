@@ -1,7 +1,7 @@
 //
 //  File:      MenuBarMetric.swift
 //  Created:   2026-06-19
-//  Updated:   2026-10-15
+//  Updated:   2026-10-16
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  iStat-style menu-bar glyph renderers and the per-metric dropdown panels. Glyphs are
 //             drawn to NSImage (the only reliable way to render a live status-item label) and adapt
@@ -700,26 +700,10 @@ struct NETMenuDropdown: View {
     @AppStorage(UIScale.zoomKey) private var uiZoom = 1.0
     @AppStorage(UIScale.densityKey) private var uiDensity = Density.standard.rawValue
     let monitor: SiliconScopeMonitor
-    private let green = Palette.gpu.color
     var body: some View {
         let n = monitor.snapshot.network
-        let ifaces = InterfaceSampler.sample()
-        let connected = ifaces.filter { $0.isConnected }
-        let notConnected = ifaces.filter { !$0.isConnected }
         VStack(alignment: .leading, spacing: Space.tight) {
             MenuSectionHeader("Network")
-            ForEach(connected) { i in
-                HStack(spacing: Space.row) {
-                    Image(systemName: ifaceIcon(i)).font(.system(size: Icon.large)).foregroundStyle(Theme.accent)
-                    VStack(alignment: .leading, spacing: Space.hair) {
-                        Text(i.name).font(Theme.font(.body)).foregroundStyle(Theme.text).lineLimit(1)
-
-                    }
-                    Spacer(minLength: 0)
-                    Text("Connected").font(Theme.font(.caption)).foregroundStyle(green)
-                }
-            }
-            Divider()
             NetworkAddressesView(network: n)
             Divider()
             MenuKV(label: "↓ Download", value: formatRate(n.downloadBytesPerSec), color: MetricPalette.downC)
@@ -733,26 +717,12 @@ struct NETMenuDropdown: View {
                 Text("Peak ↑ \(formatRate(monitor.history.netUp.withoutGaps.max() ?? 0))")
                     .font(Theme.font(.caption)).foregroundStyle(Theme.faint)
             }
-            if !notConnected.isEmpty {
-                Divider()
-                MenuSectionHeader("Not Connected")
-                ForEach(notConnected) { i in
-                    Text(i.name).font(Theme.font(.detail))
-                        .foregroundStyle(Theme.dim).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
             Divider()
             MenuActionsFooter()
         }
         .padding(.horizontal, Space.section).padding(.vertical, Space.card).frame(width: Layout.Surface.dropdownWidth).background(Theme.bg).foregroundStyle(Theme.text)
     }
 
-    private func ifaceIcon(_ i: InterfaceInfo) -> String {
-        let n = i.name.lowercased()
-        if n.contains("wi-fi") || n.contains("wifi") || n.contains("airport") { return "wifi" }
-        if n.contains("thunderbolt") || n.contains("bridge") { return "bolt.horizontal" }
-        return "cable.connector"
-    }
 }
 
 struct SSDMenuDropdown: View {

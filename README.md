@@ -211,7 +211,6 @@ Prefer to build it yourself? See [Build & run](#build--run).
 - **Memory bandwidth** — CPU / GPU / Media / ANE / total GB/s (the local-LLM bottleneck signal)
 - **Memory** — Wired / Active / Compressed / Free stacked bar + macOS **memory-pressure** alerts
 - **Network** ↑/↓ and **Disk** read/write + free space, with live graphs
-- **Network addresses** — local IPv4/IPv6 and VPN route addresses; optional public IP via ipify, disabled by default ([source and privacy details](docs/network-addresses.md))
 - **Per-unit temperatures** — real **E-Core / P-Core / GPU / Memory** sensors via curated
   per-generation SMC keys (M1–M5; HID fallback on others), fan RPM, thermal pressure, and
   **GPU throttle detection** (clock held below its rolling peak under pressure)

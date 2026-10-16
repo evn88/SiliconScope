@@ -1,7 +1,7 @@
 //
 //  File:      SettingsView.swift
 //  Created:   2026-06-08
-//  Updated:   2026-10-15
+//  Updated:   2026-07-27
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Preferences window (Cmd+,). Refresh cadence, temperature unit, menu-bar
 //             compact GPU mode, launch-at-login, threshold alerts, and the AI runtime API
@@ -25,7 +25,6 @@ struct SettingsView: View {
     @AppStorage("temperatureFahrenheit") private var fahrenheit = false
     @AppStorage("compactGPUMode") private var compactGPU = false
     @AppStorage("showDockIcon") private var showDockIcon = true
-    @AppStorage("publicIPLookupEnabled") private var publicIPLookupEnabled = false
     @AppStorage("aiRuntimeAPIEnabled") private var aiRuntimeAPIEnabled = false
     @AppStorage("aiRuntimeOllamaPort") private var ollamaPort = 11434
     @AppStorage("aiRuntimeLMStudioPort") private var lmStudioPort = 1234
@@ -95,14 +94,6 @@ struct SettingsView: View {
                 Text("Startup & alerts")
             } footer: {
                 Text("On GPU thermal throttle or memory pressure, the affected card's border turns amber/red. The in-app warning banner is on by default (turn it off above); optional macOS notifications fire once per event.")
-            }
-
-            Section {
-                Toggle("Look up public IP using ipify", isOn: $publicIPLookupEnabled)
-            } header: {
-                Text("Public IP (opt-in)")
-            } footer: {
-                Text("Contacts api64.ipify.org over HTTPS. ipify sees your public IP. Refreshes every 10 minutes while Network is sampled; network changes can refresh after at least 1 minute. Local IP addresses require no external request.")
             }
 
             Section {

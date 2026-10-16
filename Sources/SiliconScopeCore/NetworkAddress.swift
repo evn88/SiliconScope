@@ -1,13 +1,12 @@
 //
 //  File:      NetworkAddress.swift
 //  Created:   2026-10-15
-//  Updated:   2026-10-15
+//  Updated:   2026-10-16
 //  Developer: SiliconScope contributors
 //  Overview:  Local interface addresses and default-route provenance, without network requests.
 //  Notes:     Unlike throughput, address selection includes VPN tunnel interfaces.
 //
 import Foundation
-import SystemConfiguration
 import Darwin
 
 public struct NetworkAddress: Sendable, Equatable, Codable, Identifiable {
@@ -47,46 +46,23 @@ public enum IPAddress {
     }
 }
 
-public enum NetworkAddressSampler {
-    public static func sample() -> [NetworkAddress]? {
-        let store = SCDynamicStoreCreate(nil, "SiliconScope.addresses" as CFString, nil, nil)
-        func primary(_ family: String) -> String? {
-            guard let store else { return nil }
-            return (SCDynamicStoreCopyValue(store, "State:/Network/Global/\(family)" as CFString)
-                    as? [String: Any])?["PrimaryInterface"] as? String
-        }
-        let ipv4 = primary("IPv4"), ipv6 = primary("IPv6")
-        var head: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&head) == 0 else { return nil }
-        defer { freeifaddrs(head) }
-        var pointer = head
-        var addresses: [NetworkAddress] = []
-        while let entry = pointer {
-            defer { pointer = entry.pointee.ifa_next }
-            let ifa = entry.pointee
-            guard ifa.ifa_flags & UInt32(IFF_UP) != 0,
-                  ifa.ifa_flags & UInt32(IFF_RUNNING) != 0,
-                  ifa.ifa_flags & UInt32(IFF_LOOPBACK) == 0,
-                  let addr = ifa.ifa_addr,
-                  addr.pointee.sa_family == UInt8(AF_INET) || addr.pointee.sa_family == UInt8(AF_INET6) else { continue }
-            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            guard getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count),
-                              nil, 0, NI_NUMERICHOST) == 0 else { continue }
-            let value = String(cBuffer: host)
-            guard IPAddress.usableLocal(value) else { continue }
-            let bsd = String(cString: ifa.ifa_name)
-            let v6 = addr.pointee.sa_family == UInt8(AF_INET6)
-            addresses.append(NetworkAddress(interface: bsd, address: value, isIPv6: v6,
-                                            isPrimary: bsd == (v6 ? ipv6 : ipv4)))
-        }
-        return ordered(addresses)
-    }
-    /// Secondary/tunnel address changes invalidate the exit-IP cache even when the
-    /// SystemConfiguration primary interface stays on the physical transport.
-    public static func routeFingerprint(_ addresses: [NetworkAddress]?) -> String {
-        guard let addresses, addresses.contains(where: \.isPrimary) else { return "" }
-        return addresses.map { ($0.isPrimary ? "primary:" : "other:") + $0.id }
-            .sorted().joined(separator: "|")
+enum NetworkAddressSampler {
+    /// Decode address entries from the network sampler's existing getifaddrs walk.
+    static func address(_ ifa: ifaddrs, primaryIPv4: String?, primaryIPv6: String?) -> NetworkAddress? {
+        guard ifa.ifa_flags & UInt32(IFF_UP) != 0,
+              ifa.ifa_flags & UInt32(IFF_RUNNING) != 0,
+              ifa.ifa_flags & UInt32(IFF_LOOPBACK) == 0,
+              let name = ifa.ifa_name, let addr = ifa.ifa_addr,
+              addr.pointee.sa_family == UInt8(AF_INET) || addr.pointee.sa_family == UInt8(AF_INET6) else { return nil }
+        var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        guard getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count),
+                          nil, 0, NI_NUMERICHOST) == 0 else { return nil }
+        let value = String(cBuffer: host)
+        guard IPAddress.usableLocal(value) else { return nil }
+        let bsd = String(cString: name)
+        let v6 = addr.pointee.sa_family == UInt8(AF_INET6)
+        return NetworkAddress(interface: bsd, address: value, isIPv6: v6,
+                              isPrimary: bsd == (v6 ? primaryIPv6 : primaryIPv4))
     }
 
     static func ordered(_ addresses: [NetworkAddress]) -> [NetworkAddress] {

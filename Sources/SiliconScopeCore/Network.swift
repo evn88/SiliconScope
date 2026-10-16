@@ -1,7 +1,7 @@
 //
 //  File:      Network.swift
 //  Created:   2026-06-08
-//  Updated:   2026-10-15
+//  Updated:   2026-10-16
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Network throughput (download/upload bytes per second) sampled sudolessly
 //             via getifaddrs. Stateful: diffs interface byte counters against the
@@ -51,9 +51,12 @@ public struct NetworkSample: Sendable, Equatable, Codable {
 
     /// nil on older recordings/remote agents; [] means no usable local addresses.
     public var localAddresses: [NetworkAddress]?
-    public var publicIPAddress: String?
-    public var publicIPStatus: PublicIPStatus?
-    public var publicIPObservedAt: Date?
+
+    /// Address association is always by BSD identity within this snapshot, including replay.
+    /// nil means this recording did not report addresses; [] means none for this interface.
+    public func addresses(for bsdName: String) -> [NetworkAddress]? {
+        localAddresses.map { NetworkAddressSampler.ordered($0.filter { $0.interface == bsdName }) }
+    }
 
     public init() {}
 
@@ -65,9 +68,6 @@ public struct NetworkSample: Sendable, Equatable, Codable {
         uploadBytesPerSec   = try c.decodeIfPresent(Double.self, forKey: .uploadBytesPerSec)   ?? 0
         interfaces          = try c.decodeIfPresent([InterfaceStat].self, forKey: .interfaces)  ?? []
         localAddresses = try c.decodeIfPresent([NetworkAddress].self, forKey: .localAddresses)
-        publicIPAddress = try c.decodeIfPresent(String.self, forKey: .publicIPAddress)
-        publicIPStatus = try c.decodeIfPresent(PublicIPStatus.self, forKey: .publicIPStatus)
-        publicIPObservedAt = try c.decodeIfPresent(Date.self, forKey: .publicIPObservedAt)
     }
 }
 
@@ -83,12 +83,12 @@ public final class NetworkSampler {
     // Cached BSD name -> Display name map from SystemConfiguration.
     private var nameCache: [String: String] = [:]
 
-    // The interface carrying the default route, re-read at most every `primaryRefresh` seconds:
-    // it changes only when the network does (Wi-Fi ↔ Ethernet), not between ticks.
-    private static let primaryRefresh: UInt64 = 5_000_000_000   // ns
+    // Reuse one SC store; refresh both default-route families at the existing 5-second cadence.
+    private static let primaryRefresh: UInt64 = 5_000_000_000
     private let store = SCDynamicStoreCreate(nil, "SiliconScope.network" as CFString, nil, nil)
-    private var primary: String?
-    private var primaryReadNs: UInt64 = 0
+    private var primaryIPv4: String?
+    private var primaryIPv6: String?
+    private var primaryReadNs: UInt64?
 
     public init() {
         refreshNameCache()
@@ -133,18 +133,18 @@ public final class NetworkSampler {
 
     /// System Configuration's primary interface (the default route), IPv4 first, then IPv6.
     private func primaryInterface(now: UInt64) -> String? {
-        if primaryReadNs != 0, now &- primaryReadNs < Self.primaryRefresh { return primary }
-        primaryReadNs = now
-        primary = nil
-        guard let store else { return nil }
-        for key in ["State:/Network/Global/IPv4", "State:/Network/Global/IPv6"] {
-            if let dict = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any],
-               let name = dict["PrimaryInterface"] as? String {
-                primary = name
-                break
-            }
+        if let last = primaryReadNs, now >= last, now - last < Self.primaryRefresh {
+            return primaryIPv4 ?? primaryIPv6
         }
-        return primary
+        primaryReadNs = now
+        func primary(_ family: String) -> String? {
+            guard let store else { return nil }
+            return (SCDynamicStoreCopyValue(store, "State:/Network/Global/\(family)" as CFString)
+                    as? [String: Any])?["PrimaryInterface"] as? String
+        }
+        primaryIPv4 = primary("IPv4")
+        primaryIPv6 = primary("IPv6")
+        return primaryIPv4 ?? primaryIPv6
     }
 
     /// The breakdown's order: the primary interface first, then the rest by name, so the
@@ -166,11 +166,12 @@ public final class NetworkSampler {
     }
 
     public func sample() -> NetworkSample {
-        let raw = Self.scanInterfaces()
         let now = DispatchTime.now().uptimeNanoseconds
+        let primary = primaryInterface(now: now)
+        let (raw, addresses) = Self.scanInterfaces(primaryIPv4: primaryIPv4, primaryIPv6: primaryIPv6)
 
         var result = NetworkSample()
-        result.localAddresses = NetworkAddressSampler.sample()
+        result.localAddresses = addresses
 
         if previousTimeNs > 0 {
             let seconds = Double(now &- previousTimeNs) / 1_000_000_000
@@ -185,7 +186,7 @@ public final class NetworkSampler {
 
             // Primary interface first, then by name: a stable order that never cuts the
             // interface carrying the traffic.
-            let ordered = Self.breakdownOrder(Array(raw.keys), primary: primaryInterface(now: now))
+            let ordered = Self.breakdownOrder(Array(raw.keys), primary: primary)
 
             for bsd in ordered {
                 guard let info = raw[bsd] else { continue }
@@ -225,12 +226,14 @@ public final class NetworkSampler {
     }
 
     /// Scans getifaddrs and returns byte counters and address status for non-tunnel, up interfaces.
-    private static func scanInterfaces() -> [String: InterfaceRawInfo] {
+    private static func scanInterfaces(primaryIPv4: String?, primaryIPv6: String?)
+        -> ([String: InterfaceRawInfo], [NetworkAddress]?) {
         var addrs: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&addrs) == 0 else { return [:] }
+        guard getifaddrs(&addrs) == 0 else { return ([:], nil) }
         defer { freeifaddrs(addrs) }
 
         var out: [String: InterfaceRawInfo] = [:]
+        var addresses: [NetworkAddress] = []
         var pointer = addrs
         while let entry = pointer {
             defer { pointer = entry.pointee.ifa_next }
@@ -238,6 +241,10 @@ public final class NetworkSampler {
             guard (flags & IFF_UP) != 0, (flags & IFF_LOOPBACK) == 0 else { continue }
             guard let ifaName = entry.pointee.ifa_name else { continue }
             let bsd = String(cString: ifaName)
+            if let address = NetworkAddressSampler.address(entry.pointee, primaryIPv4: primaryIPv4,
+                                                          primaryIPv6: primaryIPv6) {
+                addresses.append(address)
+            }
             guard !isVirtualOrTunnel(bsdName: bsd) else { continue }
 
             guard let addr = entry.pointee.ifa_addr else { continue }
@@ -262,6 +269,6 @@ public final class NetworkSampler {
                 if routable { out[bsd, default: InterfaceRawInfo()].hasRoutableAddress = true }
             }
         }
-        return out
+        return (out, NetworkAddressSampler.ordered(addresses))
     }
 }

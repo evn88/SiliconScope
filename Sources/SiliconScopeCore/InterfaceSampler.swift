@@ -1,13 +1,12 @@
 //
 //  File:      InterfaceSampler.swift
 //  Created:   2026-06-19
-//  Updated:   2026-10-15
+//  Updated:   2026-10-16
 //  Developer: Kennt Kim / Calida Lab
 //  Overview:  Lists network interfaces (friendly name, BSD name, IPv4, connected) sudolessly
 //             via SystemConfiguration (display names) + getifaddrs (addresses / up state).
 //             Powers the Network menu-bar dropdown's interface list + "Not Connected".
-//  Notes:     This sampler remains local only. Public-IP requests are separate and opt-in.
-//             Connected includes usable IPv6-only interfaces. Per-process network I/O
+//  Notes:     Local only; connected includes usable IPv6-only interfaces. Per-process network I/O
 //             is not obtainable sudolessly, so it is omitted.
 //
 import Foundation
